@@ -1,0 +1,2 @@
+file ./targets/objs/kernel.exe
+target remote:1234

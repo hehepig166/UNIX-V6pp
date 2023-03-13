@@ -29,47 +29,37 @@ unsigned int PEParser::Relocate(Inode* p_inode, int sharedText)
 	/* 如果可以和其它进程共享正文段，无需文件中读入正文段 */
 	PageTable* pUserPageTable = Machine::Instance().GetUserPageTableArray();
 	unsigned int textBegin = this->TextAddress >> 12 , textLength = this->TextSize >> 12;
+	unsigned int rdataBegin = this->RDataAddress>>12 , rdataLength = this->RDataSize>>12;
 	PageTableEntry* pointer = (PageTableEntry *)pUserPageTable;
 
 	/*如果与其它进程共享正文段，共享正文段切不可清0*/
-	if(sharedText == 1)
-		i = 1;      // i是段头索引
-	else
-	{
-		i = 0;
+	if (!sharedText) {
 		// 修改正文段的读写标志，为内核写代码段做准备
-		for (i0 = textBegin; i0 < textBegin + textLength; i0++)
+		for (i0 = textBegin; i0 < textBegin + textLength - rdataLength; i0++)
 			pointer[i0].m_ReadWriter = 1;
-
+		for (i0 = rdataBegin; i0 < rdataBegin + rdataLength; i0++)
+			pointer[i0].m_ReadWriter = 1;
 		FlushPageDirectory();
 	}
 
     /* 对所有页面执行清0操作，这样bss变量的初值就是0 */
-	for (; i <= this->BSS_SECTION_IDX; i++ )
+	// 要是 sharedText，共享正文段（数据段和只读数据段）不能清零
+	for (i = 0; i <= this->BSS_SECTION_IDX; i++ ) if (!sharedText || (i!=TEXT_SECTION_IDX && i!=RDATA_SECTION_IDX))
 	{
 		ImageSectionHeader* sectionHeader = &(this->sectionHeaders[i]);
 		int beginVM = sectionHeader->VirtualAddress + ntHeader.OptionalHeader.ImageBase;
 		int size = ((sectionHeader->Misc.VirtualSize + PageManager::PAGE_SIZE - 1)>>12)<<12;
 		int j;
 
-//		if(sharedText == 0 || i != 0)
-//		{
-			for (j=0; j<size; j++)
-			{
-				unsigned char* b =(unsigned char*)(j + beginVM);
-				*b = 0;
-			}
-//		}
+		for (j=0; j<size; j++)
+		{
+			unsigned char* b =(unsigned char*)(j + beginVM);
+			*b = 0;
+		}
 	}
 
-	/* 读正文段（optional）；读文件，得全局变量的初值  */
- 	if(sharedText == 1)
-		i = 1;      // i是段头索引
-	else
-	// 修改正文段的读写标志，为内核写代码段做准备
-		i = 0;
 
-	for ( ; i < this->BSS_SECTION_IDX; i++ )
+	for (i = 0; i < this->BSS_SECTION_IDX; i++ ) if (!sharedText || (i!=TEXT_SECTION_IDX && i!=RDATA_SECTION_IDX))
 	{
 		ImageSectionHeader* sectionHeader = &(this->sectionHeaders[i]);
 		srcAddress = sectionHeader->PointerToRawData;
@@ -86,8 +76,11 @@ unsigned int PEParser::Relocate(Inode* p_inode, int sharedText)
 	}
 
 	if(sharedText == 0)
-	{   //将正文段页面改回只读
-		for (i0 = 0; i0 < textLength; i0++)
+	{   
+		//将正文段页面改回只读
+		for (i0 = textBegin; i0 < textBegin + textLength - rdataLength; i0++)
+			pointer[i0].m_ReadWriter = 0;
+		for (i0 = rdataBegin; i0 < rdataBegin + rdataLength; i0++)
 			pointer[i0].m_ReadWriter = 0;
 
 		FlushPageDirectory();
@@ -161,14 +154,21 @@ bool PEParser::HeaderLoad(Inode* p_inode)
     	 * section 顺序为 .text->.data->.rdata->.bss
     	 *
     */
+
+	this->RDataAddress =
+		this->sectionHeaders[this->RDATA_SECTION_IDX].VirtualAddress + ntHeader.OptionalHeader.ImageBase;
+	this->RDataSize =
+		this->sectionHeaders[this->BSS_SECTION_IDX].VirtualAddress - this->sectionHeaders[this->RDATA_SECTION_IDX].VirtualAddress;
+
 	this->TextAddress =
 		ntHeader.OptionalHeader.BaseOfCode + ntHeader.OptionalHeader.ImageBase;
 	this->TextSize =
-		ntHeader.OptionalHeader.BaseOfData - ntHeader.OptionalHeader.BaseOfCode;
+		ntHeader.OptionalHeader.BaseOfData - ntHeader.OptionalHeader.BaseOfCode + this->RDataSize;
 
 	this->DataAddress =
 		ntHeader.OptionalHeader.BaseOfData + ntHeader.OptionalHeader.ImageBase;
-	this->DataSize = this->sectionHeaders[this->IDATA_SECTION_IDX].VirtualAddress - ntHeader.OptionalHeader.BaseOfData;
+	this->DataSize =
+		this->sectionHeaders[this->IDATA_SECTION_IDX].VirtualAddress - ntHeader.OptionalHeader.BaseOfData - this->RDataSize;
 
     StackSize = ntHeader.OptionalHeader.SizeOfStackCommit;
     HeapSize = ntHeader.OptionalHeader.SizeOfHeapCommit;

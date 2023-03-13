@@ -46,7 +46,10 @@ SHELL_OBJS =$(TARGET)\cat.exe	\
 			$(TARGET)\malloc.exe \
 			$(TARGET)\testSTDOUT.exe \
 			$(TARGET)\fork.exe \
-			$(TARGET)\helloWorld.exe
+			$(TARGET)\helloWorld.exe \
+			$(TARGET)\testMygetpid.exe \
+			$(TARGET)\hehepig.exe \
+			$(TARGET)\test_print.exe
 			
 #$(TARGET)\performance.exe
 			
@@ -137,6 +140,18 @@ $(TARGET)\testSTDOUT.exe :	testSTDOUT.c
 $(TARGET)\helloWorld.exe :	helloWorld.c
 	$(CC) $(CFLAGS) -I"$(INCLUDE)" -I"$(LIB_INCLUDE)"  $< -e _main1 $(V6++LIB) -o $@
 	copy $(TARGET)\helloWorld.exe $(MAKEIMAGEPATH)\$(BIN)\helloWorld
+
+$(TARGET)\hehepig.exe :	hehepig.c
+	$(CC) $(CFLAGS) -I"$(INCLUDE)" -I"$(LIB_INCLUDE)"  $< -e _main1 $(V6++LIB) -o $@
+	copy $(TARGET)\hehepig.exe $(MAKEIMAGEPATH)\$(BIN)\hehepig
+
+$(TARGET)\testMygetpid.exe : testMygetpid.c
+	$(CC) $(CFLAGS) -I"$(INCLUDE)" -I"$(LIB_INCLUDE)"  $< -e _main1 $(V6++LIB) -o $@
+	copy $(TARGET)\testMygetpid.exe $(MAKEIMAGEPATH)\$(BIN)\testMygetpid
+
+$(TARGET)\test_print.exe : test_print.c
+	$(CC) $(CFLAGS) -I"$(INCLUDE)" -I"$(LIB_INCLUDE)"  $< -e _main1 $(V6++LIB) -o $@
+	copy $(TARGET)\test_print.exe $(MAKEIMAGEPATH)\$(BIN)\test_print
 
 clean:
 	del $(TARGET)\*.exe

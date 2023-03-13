@@ -80,6 +80,21 @@ int getswtch();
 /* 启用屏幕底部的lines行输出调试信息 */
 int trace(int lines);
 
+/* 获取父进程pid */
+int getppid(int pid);
 
+/* mygetpid */
+int mygetpid();
+
+/* mygetinfo */
+struct t_myinfo {
+    unsigned long xdxxysb_wldz;			// 相对虚实映射表物理地址
+	unsigned long xdxxysb_wlykh;		// 相对虚实映射表物理页框号
+    unsigned long ppdaStartAddress_v;	// PPDA区起始地址（逻辑）
+    unsigned long ppdaStartAddress_p;	// PPDA区起始地址（物理）
+    unsigned long textStartAddress_v;	// 代码段起始地址（逻辑）
+    unsigned long textStartAddress_p;	// 代码段起始地址（物理）
+};
+int mygetinfo(struct t_myinfo *p_myinfo);
 
 #endif

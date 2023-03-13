@@ -6,6 +6,7 @@
 #include "CRT.h"
 #include "Video.h"
 
+
 /* 系统调用入口表的定义
  * 参照UNIX V6中sysent.c中对系统调用入口表sysent的定义 @line 2910 
  */
@@ -60,15 +61,15 @@ SystemCallTableEntry SystemCall::m_SystemEntranceTable[SYSTEM_CALL_NUM] =
 	{ 1, &Sys_Setgid},				/* 46 = setgid	*/
 	{ 0, &Sys_Getgid},				/* 47 = getgid	*/
 	{ 2, &Sys_Ssig	},				/* 48 = sig	*/
-	{ 0, &Sys_Nosys	},				/* 49 = nosys	*/
-	{ 0, &Sys_Nosys	},				/* 50 = nosys	*/
-	{ 0, &Sys_Nosys	},				/* 51 = nosys	*/
+	{ 1, &Sys_Getppid},				/* 49 = getppid	*/
+	{ 0, &Sys_Mygetpid},				/* 50 = mygetpid	*/
+	{ 1, &Sys_Mygetinfo	},				/* 51 = mygetinfo	*/
 	{ 0, &Sys_Nosys	},				/* 52 = nosys	*/
 	{ 0, &Sys_Nosys	},				/* 53 = nosys	*/
 	{ 0, &Sys_Nosys	},				/* 54 = nosys	*/
 	{ 0, &Sys_Nosys	},				/* 55 = nosys	*/
 	{ 0, &Sys_Nosys	},				/* 56 = nosys	*/
-	{ 0, &Sys_Nosys	},				/* 57= nosys	*/
+	{ 0, &Sys_Nosys	},				/* 57 = nosys	*/
 	{ 0, &Sys_Nosys	},				/* 58 = nosys	*/
 	{ 0, &Sys_Nosys	},				/* 59 = nosys	*/
 	{ 0, &Sys_Nosys	},				/* 60 = nosys	*/
@@ -719,4 +720,66 @@ int SystemCall::Sys_Ssig()
 	u.u_procp->Ssig();
 
 	return 0;	/* GCC likes it ! */
+}
+
+/*	49 = getppid	count = 1	*/
+int SystemCall::Sys_Getppid()
+{
+	ProcessManager &procMgr = Kernel::Instance().GetProcessManager();
+	User &u = Kernel::Instance().GetUser();
+
+	int i;
+	int curpid = (int)u.u_arg[0];	// 获取函数参数（查询的pid号）
+
+	u.u_ar0[User::EAX] = -1;		// 先给返回值置默认值-1，
+
+	// 若找到进程号符合的，则用它的ppid覆盖EAX作为返回值
+	for (i=0; i<ProcessManager::NPROC; i++) {
+		if (procMgr.process[i].p_pid == curpid) {
+			u.u_ar0[User::EAX] = procMgr.process[i].p_ppid;
+		}
+	}
+}
+
+/* 50 = mygetpid	count = 0 */
+int SystemCall::Sys_Mygetpid()
+{
+	User& u = Kernel::Instance().GetUser();
+	u.u_ar0[User::EAX] = u.u_procp->p_pid;	// 这个是改变核心栈现场区EAX对应那里
+
+	return 0;	// 这个return 是改变cpu寄存器EAX
+}
+
+/* 51 = mygetinfo	count = 0 */
+int SystemCall::Sys_Mygetinfo()
+{
+	// 获取 user 结构
+	User &u = Kernel::Instance().GetUser();
+	MemoryDescriptor *u_md = &(u.u_MemoryDescriptor);
+
+	// 获取t_myinfo结构指针（传入的参数）
+	struct t_myinfo {
+		unsigned long xdxxysb_wldz;			// 相对虚实映射表物理地址
+		unsigned long xdxxysb_wlykh;		// 相对虚实映射表物理页框号
+		unsigned long ppdaStartAddress_v;	// PPDA区起始地址（逻辑）
+		unsigned long ppdaStartAddress_p;	// PPDA区起始地址（物理）
+		unsigned long textStartAddress_v;	// 代码段起始地址（逻辑）
+		unsigned long textStartAddress_p;	// 代码段起始地址（物理）
+	};
+	struct t_myinfo *p_myinfo = (struct t_myinfo*)u.u_arg[0];
+
+	// 计算结果
+	//unsigned long p_upt = (unsigned long)(u_md->GetUserPageTableArray()) - 0xc0000000;
+	//p_myinfo->xdxxysb_wldz = p_upt;			// 相对虚实映射表物理地址
+	//p_myinfo->xdxxysb_wlykh = p_upt>>12;	// 相对虚实映射表物理页框号
+
+	p_myinfo->ppdaStartAddress_v = 0x3ff000u + 0xc0000000u;					// ppda区首逻辑地址，固定在4M区最后一页
+	p_myinfo->textStartAddress_v = u_md->GetTextStartAddress();				// 代码段首逻辑地址
+
+	p_myinfo->ppdaStartAddress_p = u.u_procp->p_addr;				// ppda区首物理地址，从process里面找
+	p_myinfo->textStartAddress_p = u.u_procp->p_textp->x_caddr;		// 代码段首物理地址，从text里面找
+
+	u.u_ar0[User::EAX] = 0;
+
+	return 0;
 }

@@ -222,6 +222,16 @@ private:
 	
 	/*	49 ~ 63 = nosys	count = 0	*/	
 
+
+	/*	49 = getppid	count = 1	*/
+	static int Sys_Getppid();
+
+	/*	50 = mygetppid	count = 0	*/
+	static int Sys_Mygetpid();
+
+	/*	51 = mygetinfo	count = 1 	*/
+	static int Sys_Mygetinfo();
+
 private:
 	/*系统调用入口表的声明*/
 	static SystemCallTableEntry m_SystemEntranceTable[SYSTEM_CALL_NUM];

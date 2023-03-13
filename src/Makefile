@@ -29,10 +29,10 @@ $(DIRS) :
 	$(MAKE) --directory=$@
 	
 build	: $(DIRS)	
-	$(LD) $(LDFLAGS) $(OBJS) -o $(TARGET)\kernel.exe	
-	$(OBJCOPY) -O binary $(TARGET)\kernel.exe $(TARGET)\kernel.bin
-	$(NM) $(TARGET)\kernel.exe > $(TARGET)\kernel.sym
-	$(OBJDUMP) -d $(TARGET)\kernel.exe  > $(TARGET)\kernel.asm
+	$(LD) $(LDFLAGS) $(OBJS) -o $(TARGET)\kernel.exe					
+	$(OBJCOPY) -O binary $(TARGET)\kernel.exe $(TARGET)\kernel.bin		
+	$(NM) $(TARGET)\kernel.exe > $(TARGET)\kernel.sym					
+	$(OBJDUMP) -d $(TARGET)\kernel.exe  > $(TARGET)\kernel.asm			
 
 deploy	:
 

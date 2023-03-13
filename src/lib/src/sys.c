@@ -192,3 +192,28 @@ int sbrk(int increment)
 	fakeedata = newedata + 1;
 	return fakeedata;
 }
+
+
+int getppid(int pid)
+{
+	int res;
+	__asm__ volatile("int $0x80":"a="(res):"a"(49),"b"(pid));
+	// Sys_Getppid 里面已经处理好了 -1 的情况，这里直接 return res 就行了？
+	return res;
+}
+
+
+int mygetpid()
+{
+	int res;
+	__asm__ volatile("int $0x80":"a="(res):"a"(50));
+	return res<0 ? -1 : res;
+}
+
+
+int mygetinfo(struct t_myinfo *p_myinfo)
+{
+	int res;
+	__asm__ volatile("int $0x80":"a="(res):"a"(51),"b"(p_myinfo));
+	return res<0 ? -1 : res;
+}

@@ -1,4 +1,4 @@
-@set oos_path=D:\UNIX V6++V1\oos
+@set oos_path=D:\UNIX V6++V1\oos_dev
 @set mingw_path=D:\UNIX V6++V1\MinGW\bin
 @set nasm_path=D:\UNIX V6++V1\NASM
 @set bochs_path=D:\UNIX V6++V1\Bochs-2.6

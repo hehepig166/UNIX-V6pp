@@ -145,6 +145,9 @@ public:
 	unsigned long TextAddress;
 	unsigned long TextSize;
 	
+    unsigned long RDataAddress;
+    unsigned long RDataSize;
+
 	unsigned long DataAddress;
 	unsigned long DataSize;
 
