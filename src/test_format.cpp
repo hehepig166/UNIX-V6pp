@@ -53,39 +53,121 @@ void test_format(const char *fpath)
     }
 
     close(fd);
-//=================================================
 
-    Kernel::Instance().Initialize();
+    cout <<"file " <<fpath <<" created.." <<endl;
+//=================================================
+// init
+    Kernel::Instance().Initialize(fpath);
+
+    auto &fs = Kernel::Instance().GetFileSystem();
+    auto &bm = Kernel::Instance().GetBufferManager();
+    auto &itb = Kernel::Instance().GetInodeTable();
+    auto &fm = Kernel::Instance().GetFileManager();
+    auto *psb = fs.GetFS(0);
+
+    psb->s_isize = inodenum;
+    psb->s_fsize = PARAMS::DATA_ZONE_SIZE;
+
+    Buf     *pBuf = NULL;
+    Inode   *pnode = NULL;
+    int     t1, t2;
 
     for (int i=blknum-1; i>=PARAMS::DATA_ZONE_START_SECTOR; i--) {
         Kernel::Instance().GetFileSystem().Free(0, i);
     }
-
     cout <<"Blocks format done." <<endl;
 
-    Buf *pBuf;
+    pnode = itb.IGet(0, PARAMS::ROOTINO);
+    pnode->i_mode = Inode::IFDIR | Inode::IRWXU | Inode::IRWXG | Inode::IRWXO;
+    pBuf = fs.Alloc(0);
+    t1 = pBuf->b_blkno;
+    bm.RlsBlk(pBuf);
+    pnode->i_addr[0] = t1;
+    pnode->i_size = 0;
 
-    pBuf = Kernel::Instance().GetFileSystem().Alloc(0);
+    
+
+    itb.IPut(pnode);
+    cout <<"rootdir created." <<endl;
+
+
+    t1 = fm.Create("/1.txt", FileManager::CREATE);
+    cout <<"create file /1.txt [" <<t1 <<"]" <<endl;
+
+    t2 = fm.Create("/2.txt", FileManager::CREATE);
+    cout <<"create file /2.txt [" <<t2 <<"]" <<endl;
+
+    cout <<"close [" <<t1 <<"] return " <<fm.Close(t1) <<endl;
+
+    t1 = fm.Create("/3.txt", FileManager::CREATE);
+    cout <<"create file /3.txt [" <<t1 <<"]" <<endl;
+
+    cout <<"close [" <<t1 <<"] return " <<fm.Close(t1) <<endl;
+    cout <<"close [" <<t2 <<"] return " <<fm.Close(t2) <<endl;
+
+
+
+//==================================================
+// test block alloc/free
+
+    cout <<"\n=================test alloc/free=================" <<endl;
+
+    pBuf = fs.Alloc(0);
     memset(strbuf, '1', sizeof(strbuf));
     Utility::ByteCopy(strbuf, pBuf->b_addr, 512);
-    Kernel::Instance().GetBufferManager().RlsBlk(pBuf);
-    cout <<"fill 1 in block " <<(pBuf->b_blkno) <<endl;
+    bm.RlsBlk(pBuf);
+    cout <<"alloc and fill 1 in block " <<(t1 = pBuf->b_blkno) <<endl;
 
-    pBuf = Kernel::Instance().GetFileSystem().Alloc(0);
+    pBuf = fs.Alloc(0);
     memset(strbuf, '2', sizeof(strbuf));
     Utility::ByteCopy(strbuf, pBuf->b_addr, 512);
-    Kernel::Instance().GetBufferManager().RlsBlk(pBuf);
-    cout <<"fill 2 in block " <<(pBuf->b_blkno) <<endl;
+    bm.RlsBlk(pBuf);
+    cout <<"alloc and fill 2 in block " <<(t2 = pBuf->b_blkno) <<endl;
 
-    cout <<"free blk 1024 " <<endl;
-    Kernel::Instance().GetFileSystem().Free(0, 1024);
+    fs.Free(0, t1);
+    cout <<"free blk " <<t1 <<endl;
 
     pBuf = Kernel::Instance().GetFileSystem().Alloc(0);
     memset(strbuf, '#', sizeof(strbuf));
     Utility::ByteCopy(strbuf, pBuf->b_addr, 128);
-    Kernel::Instance().GetBufferManager().RlsBlk(pBuf);
-    cout <<"write 128 # in block " <<(pBuf->b_blkno) <<endl;
+    bm.RlsBlk(pBuf);
+    cout <<"alloc and write 128 # in block " <<(t1 = pBuf->b_blkno) <<endl;
 
+    fs.Free(0, t1);
+    cout <<"free blk " <<t1 <<endl;
+
+    fs.Free(0, t2);
+    cout <<"free blk " <<t2 <<endl;
+
+
+//===================================================
+// test inode alloc/free
+
+    cout <<"\n=================test ialloc/ifree=================" <<endl;
+
+    pnode = fs.IAlloc(0);
+    t1 = pnode->i_number;
+    itb.IPut(pnode);
+    cout <<"ialloc " <<t1 <<endl;
+
+    pnode = fs.IAlloc(0);
+    t2 = pnode->i_number;
+    itb.IPut(pnode);
+    cout <<"ialloc " <<t2 <<endl;
+
+    fs.IFree(0, t1);
+    cout <<"ifree " <<t1 <<endl;
+
+    pnode = fs.IAlloc(0);
+    t1 = pnode->i_number;
+    itb.IPut(pnode);
+    cout <<"ialloc " <<t1 <<endl;
+
+    fs.IFree(0, t1);
+    cout <<"ifree " <<t1 <<endl;
+
+    fs.IFree(0, t2);
+    cout <<"ifree " <<t2 <<endl;
 
 }
 
@@ -114,8 +196,11 @@ int main(int argc, char **argv)
     cout <<"sizeof(BufferManager)   " <<sizeof(BufferManager) <<endl;
     cout <<"sizeof(Inode)           " <<sizeof(Inode) <<endl;
     cout <<"sizeof(SuperBlock)      " <<sizeof(SuperBlock) <<endl;
+    cout <<"===================================\n" <<endl;
 
     test_format(argv[1]);
+
+    Kernel::Instance().Shutdown();
 
     return 0;
 }

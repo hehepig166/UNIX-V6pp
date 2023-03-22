@@ -80,10 +80,11 @@ Inode* InodeTable::IGet(int dev, int inumber) {
 
 
 void InodeTable::IPut(Inode *pInode) {
-    if (pInode->i_count == 1) {
+    //if (pInode->i_count == 1) {
+    if (true) {
         
         // 上锁
-        pInode->Lock();
+        pInode->i_flag |= Inode::ILOCK;
 
         // 更新外存Inode
         pInode->IUpdate(Utility::GetTime());
@@ -91,11 +92,14 @@ void InodeTable::IPut(Inode *pInode) {
         // 解锁
         pInode->Unlock();
 
-        pInode->i_flag = 0;
-        pInode->i_number = -1;
+        if (pInode->i_count == 1) {
+            pInode->i_flag = 0;
+            pInode->i_number = -1;
+        }
     }
 
     pInode->i_count--;
+    pInode->Unlock();
 }
 
 

@@ -1,1 +1,1 @@
-set args disk.img >log.txt
+set args r >/dev/zero

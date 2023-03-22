@@ -25,8 +25,10 @@ public:
     // 会对 Inode 上锁，count++
     Inode*  IGet(int dev, int inumber);
 
-    // 该 Inode 引用计数减一 count--
-    // 若减为零，则释放，并同步改动到磁盘
+    // 强制解锁，该 Inode 引用计数减一 count--
+    // ----//若减为零，则释放，并同步改动到磁盘
+    // 因为进程随时都可能会被结束，不好控制这个 count 的后续管理，
+    // 所以每次调用 IPut 都更新一次到虚拟磁盘上
     void    IPut(Inode *pInode);
 
     // 将被修改过的内存Inode更新到外存Inode

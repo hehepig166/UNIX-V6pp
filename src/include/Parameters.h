@@ -1,7 +1,9 @@
 #ifndef HEHEPIG_PARAMETERS_H
 #define HEHEPIG_PARAMETERS_H
 
-#define NULL (0)
+#ifndef NULL
+    #define NULL (0)
+#endif
 
 #define KERNEL_IMG_PATH "kernel"
 //#define DEFAULT_DEV "disk.img"
@@ -36,8 +38,8 @@ namespace PARAMS {
     static const int INODE_ZONE_SIZE = 1024 - 202;          // 磁盘上外存 Inode 区占据的扇区数
 
     static const int DATA_ZONE_START_SECTOR = 1024;         // 数据区起始扇区号
-    static const int DATA_ZONE_END_SECTOR = 2000 - 1;      // 数据区结束扇区号
-    static const int DATA_ZONE_SIZE = 2000 - DATA_ZONE_START_SECTOR;   // 数据区扇区数
+    static const int DATA_ZONE_END_SECTOR = 20000 - 1;      // 数据区结束扇区号
+    static const int DATA_ZONE_SIZE = 20000 - DATA_ZONE_START_SECTOR;   // 数据区扇区数
 
 
 

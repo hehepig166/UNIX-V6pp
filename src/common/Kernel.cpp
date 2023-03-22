@@ -10,8 +10,10 @@
 Kernel Kernel::instance;
 
 
-BufferManager   g_BufferManager;
-User            g_User;
+static BufferManager    g_BufferManager;
+static FileSystem       g_FileSystem;
+static FileManager      g_FileManager;
+static User             g_User;
 
 
 Kernel& Kernel::Instance() {
@@ -23,6 +25,8 @@ Kernel& Kernel::Instance() {
 void Kernel::Initialize(const char *rootdev_path) {
 
     m_BufferManager     = &g_BufferManager;
+    m_FileSystem        = &g_FileSystem;
+    m_FileManager       = &g_FileManager;
     m_User              = &g_User;
 
     Connect(KERNEL_IMG_PATH);
@@ -40,13 +44,19 @@ void Kernel::Initialize(const char *rootdev_path) {
     GetFileSystem().Reset();
     GetFileSystem().LoadSuperBlock();
 
+    GetOpenFileTable().Reset();
+
+    GetFileManager().Initialize();
+
+    GetUser().Initialize();
+
 }
 
 void Kernel::Connect(const char *path) {
     int fd = open(path, O_RDWR|O_CREAT, 00777);
-    lseek(fd, PARAMS::PAGE_SIZE-1, SEEK_SET);
+    lseek(fd, 4*PARAMS::PAGE_SIZE, SEEK_SET);
     write(fd, "\0", 1);
-    void *p = mmap(0, PARAMS::PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    void *p = mmap(0, 4*PARAMS::PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     close(fd);
 
     int szsum=0;
@@ -57,26 +67,45 @@ void Kernel::Connect(const char *path) {
     m_InodeTable = (InodeTable*)((char*)p+szsum);
     szsum += sizeof(InodeTable);
 
-    m_FileSystem = (FileSystem*)((char*)p+szsum);
-    szsum += sizeof(FileSystem);
+    m_OpenFileTable = (OpenFileTable*)((char*)p+szsum);
+    szsum += sizeof(OpenFileTable);
     
 }
 
 void Kernel::ConnectInitialize(const char *path) {
 
-    Connect(path);
+    Connect(KERNEL_IMG_PATH);
+
+    m_BufferManager     = &g_BufferManager;
+    m_FileSystem        = &g_FileSystem;
+    m_FileManager       = &g_FileManager;
+    m_User              = &g_User;
 
     // 已有的 Device 要重新连一下，因为 fd 不同了
     m_DeviceManager->ReOpen();
 
-    m_BufferManager     = &g_BufferManager;
-    m_User              = &g_User;
-
     // Buffer 要重置，进程间的 Buffer 独立（不在内核镜像文件中）。
     // 虽然独立，但都用 mmap 映射，相同的块会被映射到宿主机同一页面，所以还行
     m_BufferManager->Initialize();
+    
+    // FileSystem 的 m_spb 和 M_mount 里的 m_spb 要初始化
+    m_FileSystem->Initialize();
+    m_FileSystem->Reset();
+    m_FileSystem->LoadSuperBlock();
 
+    GetFileManager().Initialize();
+
+    m_User->Initialize();
 }
+
+
+
+void Kernel::Shutdown() {
+    m_User->Shutdown();
+    m_FileManager->ShutDown();
+}
+
+
 
 
 BufferManager& Kernel::GetBufferManager() {
@@ -93,6 +122,14 @@ FileSystem& Kernel::GetFileSystem() {
 
 InodeTable& Kernel::GetInodeTable() {
     return *(m_InodeTable);
+}
+
+OpenFileTable& Kernel::GetOpenFileTable() {
+    return *(m_OpenFileTable);
+}
+
+FileManager& Kernel::GetFileManager() {
+    return *(m_FileManager);
 }
 
 User& Kernel::GetUser() {

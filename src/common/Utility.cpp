@@ -7,6 +7,9 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+#include <vector>
+#include <string>
+
 int Utility::GetTime() {
     return (int)time(NULL);
 }
@@ -37,4 +40,58 @@ void Utility::DWordCopy(const int *src, int *dst, int count) {
 
 int Utility::Min(const int x, const int y) {
     return x<y ? x : y;
+}
+
+int Utility::StrCopy(const char *src, char *dst, const int mxlen, const char endchar) {
+    int i;
+    for (i=0; i<mxlen-1 && src[i] && src[i]!=endchar; i++)
+        dst[i] = src[i];
+    dst[i] = '\0';
+    return i;
+}
+
+
+
+std::vector<std::string> Utility::SplitPath(const char *path) {
+    std::vector<std::string> ret;
+    std::string curstr;
+    const char *p = path;
+
+    // 若以 '/' 开头，说明是绝对路径，记下 '/'
+    if (*p == '/') {
+        ret.push_back("/");
+        p++;
+    }
+    else {
+        ret.push_back(".");     // 默认本地路径
+    }
+
+    while (*p) {
+        while (*p && *p=='/') p++;  // 过滤多余的 '/'
+        if (!*p) break;
+        // 读取名字直到 '/' 或结束
+        while (*p && *p!='/') curstr+=*(p++);
+        if (curstr.empty()) continue;
+        ret.push_back(curstr);
+        curstr.clear();
+    }
+
+    return ret;
+}
+
+
+std::string Utility::GetParentPath(const char *path) {
+    auto dlist = SplitPath(path);
+    std::string ret;
+    for (int i=0, mi=dlist.size()-1; i<mi; i++) {
+        ret += dlist[i];
+        ret += "/";
+    }
+    return ret;
+}
+
+
+std::string Utility::GetLastPath(const char *path) {
+    auto dlist = SplitPath(path);
+    return dlist.back();
 }

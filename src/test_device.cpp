@@ -45,7 +45,7 @@ void test()
         Kernel::Instance().Initialize();
     }
     else {
-        Kernel::Instance().ConnectInitialize(KERNEL_IMG_PATH);
+        Kernel::Instance().ConnectInitialize("disk.img");
     }
 
 

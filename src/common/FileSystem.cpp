@@ -27,6 +27,11 @@ void FileSystem::Reset() {
     for (int i=0; i<PARAMS::NMOUNT; i++) m_Mount[i] = Mount();
 }
 
+void FileSystem::Shutdown() {
+    
+}
+
+
 
 void FileSystem::LoadSuperBlock() {
     
@@ -49,11 +54,11 @@ void FileSystem::LoadSuperBlock() {
 SuperBlock* FileSystem::GetSuperBlock(int dev) {
     if (dev < 0) return NULL;
     SuperBlock *ret = NULL;
-    int fd_rtdev = Kernel::Instance().GetDeviceManager().GetBlockDevice(PARAMS::ROOTDEV)->fd;
-    if (fd_rtdev <= 0) {
+    int fd = Kernel::Instance().GetDeviceManager().GetBlockDevice(dev)->fd;
+    if (fd <= 0) {
         return NULL;
     }
-    ret = (SuperBlock*)mmap(0, sizeof(SuperBlock), PROT_READ|PROT_WRITE, MAP_SHARED, fd_rtdev, SUPER_BLOCK_START_SECTOR*PARAMS::BUFFER_SIZE);
+    ret = (SuperBlock*)mmap(0, sizeof(SuperBlock), PROT_READ|PROT_WRITE, MAP_SHARED, fd, SUPER_BLOCK_START_SECTOR*PARAMS::BUFFER_SIZE);
     if (ret == MAP_FAILED) {
         return NULL;
     }
@@ -100,6 +105,9 @@ Inode* FileSystem::IAlloc(int dev) {
             // 找空闲 Inode
             for (int j=0; j<PARAMS::INODE_NUMBER_PER_SECTOR; j++) {
                 ino++;
+
+                // 0 不用（Inode 下标从 1 开始）
+                if (ino == 0) continue;
 
                 // 外存 Inode 占用与否
                 int mode = *(p + j*sizeof(DiskInode)/sizeof(int));

@@ -1,0 +1,263 @@
+#include "FileManager.h"
+#include "User.h"
+#include "Inode.h"
+#include "BufferManager.h"
+
+static FileSystem      *m_FileSystem;
+static InodeTable      *m_InodeTable;
+static OpenFileTable   *m_OpenFileTable;
+static Inode           *rootDirInode;
+
+void Initialize() {
+    m_FileSystem = &Kernel::GetFileSystem();
+    m_InodeTable = &Kernel::GetInodeTable();
+    m_OpenFileTable = &Kernel::GetOpenFileTable();
+
+    rootDirInode = m_InodeTable->IGet(PARAMS::ROOTDEV, PARAMS::ROOTINO);
+    rootDirInode->Unlock();
+
+}
+
+
+int FileManager::Open(const char *path, int mode)
+{
+    Inode *pInode;
+    User &u = Kernel::Instance().GetUser();
+
+    pInode = NameI(path, FileManager::OPEN);
+
+    if (pInode == NULL) {
+        return -1;
+    }
+
+    return Open1(pInode, mode, 0);
+}
+
+
+
+void FileManager::Creat(const char *path)
+{
+    Inode *pInode;
+    User &u = Kernel::Instance().GetUser();
+    int newAACMode = mode & (Inode::IRWXU|Inode::IRWXG|Inode::IRWXO)
+
+    pInode = NameI(path, FileManager::CREATE);
+
+    if (pInode == NULL) {
+
+    }
+    else {
+
+    }
+}
+
+
+
+Inode* FileManager::NameI(const char *path, int mode) {
+    Inode *pInode;
+    Buf *pBuf;
+    static char dirbuf[128];
+    const char *pcurChar = path;
+    char curChar = *pcurChar;
+    int freeEntryOffset;    // 以创建文件模式搜索目录时，记录空闲目录项的偏移量
+    User &u = Kernel::Instance().GetUser();
+    BufferManager &bufMgr = Kernel::Instance().GetBufferManager();
+    DirectoryEntry tmpEntry;
+
+#define GetnxtChar() curChar = *(++pcurChar)
+
+    // 若路径是以 '/' 开头，则从根目录开始搜索
+    // 否则从 User 中记录的当前工作目录开始搜索
+    pInode = (curChar=='/') ?  u.u_cdir;
+    GetnxtChar();
+
+    // 检查该 Inode 是否正在被使用，以及上锁，保证搜索过程中正在搜索的目录不会被其它人改变
+    m_InodeTable->IGet(pInode->i_dev, pInode->i_number);
+
+    while ('/' == curChar) GetnxtChar();
+
+    // 若试图更改、删除当前目录文件，则不给
+    if ('\0' = curChar && mode != FileManager::OPEN) {
+        goto out;
+    }
+
+    // 每次处理 path 中的一段路径分量
+    while (true) {
+
+        // 搜索结束了，成功找到，返回（刚好这个也上着锁）
+        if ('\0' == curChar) {
+            return pInode;
+        }
+
+        // 接下来要在 pInode （目录）文件下继续搜索
+
+        // 若要进行搜索的不是目录文件，说明不行
+        if ((pInode->i_mode & Inode::IFMT) != Inode::IFDIR) {
+            break;  // goto out
+        }
+
+        // 权限检查，IEXEC 在目录文件中表示搜索权限
+        if (Access(pInode, Inode::IEXEC) != 0) {
+            break;  // goto out
+        }
+
+        // 分离出下一个分量
+        curChar = *(pcurChar += Utility::StrCopy(pcurChar, dirbuf, DirectoryEntry::DIRSIZ, '/'));
+        while ('/' == curChar) {
+            GetnxtChar();
+        }
+
+
+        int tmp_offset = 0;
+        int tmp_rest = pInode->i_size / sizeof(DirectoryEntry);         // 根据目录文件大小计算目录项数（包含空项，因为目录删除以后并没有压缩）
+        freeEntryOffset = 0;
+        pBuf = NULL;
+
+        // 下面开始遍历目录文件，查找是否有与待找的相同的项
+        while (true) {
+
+            // 读完了，还是没找到
+            if (0 == tmp_rest) {
+                if (NULL != pBuf) {
+                    bufMgr.RlsBlk(pBuf);
+                }
+                // 若是创建新文件，而且是目标文件的父目录，则可以写入一项（这里与 FileManager::Creat 耦合较大（就是针对这个函数的））
+                if (mode == FileManager::CREATE && curChar == '\0') {
+
+                    if (Access(pInode, Inode::WRITE) != 0) {
+                        goto out;
+                    }
+
+                    u.u_pdir = pInode;
+
+                    if (freeEntryOffset) {  // 记录下 offset 给外层函数修改
+                        u.u_IOParam.m_Offset = freeEntryOffset;
+                    }
+                    else {
+                        pInode->i_flag |= Inode::IUPD;
+                    }
+
+                    return NULL;
+                }
+                else {
+                    // 否则，失败了
+                    goto out;
+                }
+            }
+
+            // 需要读入下一数据块
+            if (0 == tmp_offset%PARAMS::BLOCK_SIZE) {
+                if (!pBuf) {
+                    bufMgr.RlsBlk(pBuf);
+                }
+                int phyBlkno = pInode->Bmap(tmp_offset/PARAMS::BLOCK_SIZE);
+                pBuf = bufMgr.GetBlk(pInode->i_dev, phyBlkno);
+            }
+
+            // 读出目录项
+            Utility::ByteCopy(
+                (char*)(pBuf->b_addr + (tmp_offset % PARAMS::BLOCK_SIZE)),
+                &u.u_dent
+            );
+            tmp_offset += sizeof(DirectoryEntry);
+            tmp_rest --;
+
+
+            // 空闲目录项
+            if (0 == tmpEntry.m_ino) {
+                if ( 0 == freeEntryOffset) {
+                    freeEntryOffset = tmp_offset - sizeof(DirectoryEntry);
+                }
+                continue;
+            }
+
+            // 非空闲目录项，比较一下
+            int equal = 0;
+            for (int i=0; i<DirectoryEntry::DIRSIZ; i++) {
+                if (dirbuf[i]==0 && tmpEntry.m_name[i]==0) {
+                    break;
+                }
+                if (dirbuf[i] != tmpEntry.m_name[i]) {
+                    equal = 1;
+                    break;
+                }
+            }
+            if (!equal) {
+                continue;
+            }
+            else {
+                break;  // 到下面，获取到了目标 Inode 
+            }
+        }
+
+        if (pBuf != NULL) {
+            bufMgr.RlsBlk(pBuf);
+        }
+
+        // 删除模式，返回要删除的文件的父目录 Inode
+        // 要删除的文件 Inode 号在 u.u_dent 中
+        if (mode == FileManager::DELETE && curChar == '\0') {
+            if (Access(pInode, Inode::IWRITE)) {
+                break;
+            }
+
+            // 记录下 offset 给外层函数修改
+            u.u_IOParam.m_Offset = tmp_offset - sizeof(DirectoryEntry);
+
+            // 返回
+            return pInode;
+        }
+
+        // 其他模式，则进入目录，继续找
+        int dev = pInode->i_dev;
+        m_InodeTable->IPut(pInode);
+        pInode = m_InodeTable->IGet(dev, u.u_dent.m_ino);
+
+        if (pInode == NULL) {
+            return NULL;
+        }
+    }
+
+#undef GetnxtChar
+
+// 统一处理出错，解锁上锁的那个Inode
+out:
+    m_InodeTable->IPut(pInode);
+    return NULL;
+}
+
+
+
+Inode* FileManager::MakNode(int mode) {
+    Inode *pInode;
+    User &u = Kernel::Instance().GetUser();
+
+    pInode = m_FileSystem->IAlloc()
+    if (pInode == NULL) {
+        return NULL;
+    }
+
+    pInode->i_flag |= (Inode::IACC | Inode::IUPD);
+    pInode->i_mode = mode | Inode::IALLOC;
+    pInode->i_nlink = 1;
+    pInode->i_uid = u.u_uid;
+    pInode->i_gid = u.u_gid;
+
+    WriteDir(pInode);
+    return pInode;
+}
+
+
+void FileManager::WriteDir(Inode *pInode)
+{
+    User &u = Kernel::Instance().GetUser();
+
+    u.u_dent.m_ino = pInode->i_number;
+    Utility::ByteCopy(u.u_dbuf, u.u_dent.m_name, DirectoryEntry::DIRSIZ);
+
+    u.u_IOParam.m_Count = sizeof(DirectoryEntry);
+    u.u_IOParam.m_Base = &u.u_dent;
+    
+    u.u_pdir->WriteI();
+    m_InodeTable->IPut(u.u_pdir);
+}

@@ -67,6 +67,7 @@ public:
 
     void Initialize();
     void Reset();   // 清空，包括 InodeTable
+    void Shutdown();
 
     // 映射主超级块（ ROOTDEV 的）
     void LoadSuperBlock();
@@ -76,6 +77,8 @@ public:
     SuperBlock* GetFS(int dev);
 
     // 设备dev上申请一个空闲外存 Inode（用于创建新文件）
+    // 返回指向对应在 InodeTable 中的项的指针
+    // 会对该项上锁，记得解锁
     Inode* IAlloc(int dev);
 
     // 释放设备dev编号为number的外存 Inode（用于删除文件）
@@ -85,6 +88,7 @@ public:
     Buf* Alloc(int dev);
 
     // 回收设备dev编号为blkno的磁盘块
+    // 不可多次 free（没做检查）
     void Free(int dev, int blono);
 
     // 查找 Inode 所在的 Mount 装配块
@@ -95,7 +99,7 @@ private:
     // 检查设备dev上编号blkno的磁盘块是否属于数据盘块区
     bool BadBlock(SuperBlock *spb, short dev, int blkno);
 
-
+    
 
 };
 

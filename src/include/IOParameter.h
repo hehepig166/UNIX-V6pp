@@ -1,6 +1,8 @@
 #ifndef HEHEPIG_IOPARAMETER_H
 #define HEHEPIG_IOPARAMETER_H
 
+#include "Parameters.h"
+
 struct IOParameter {
     char*   m_Base;     // 当前目标区域的首地址
     int     m_Offset;   // 当前字节偏移量

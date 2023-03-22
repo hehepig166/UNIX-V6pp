@@ -354,7 +354,7 @@ void Inode::Unlock() {
 void Inode::Clean() {
     //this->i_flag = 0;
     this->i_mode = 0;
-    //this->i_count = 0;
+    this->i_count = 0;
     this->i_nlink = 0;
     //this->i_dev = -1;
     //this->i_number = -1;

@@ -1,0 +1,80 @@
+#ifndef HEHEPIG_FILEMANAGER_H
+#define HEHEPIG_FILEMANAGER_H
+
+#include "Inode.h"
+
+
+// 封装各种系统调用
+// 各自进程的该对象独立（只是一个函数集合）
+class FileManager {
+
+public:
+    enum DirectorySearchMode {
+        OPEN    = 0,
+        CREATE  = 1,
+        DELETE  = 2
+    };
+
+public:
+    void Initialize();
+
+    int Open(const char *path, int mode);
+    int Creat(const char *path, int mode);
+    
+
+
+    // 获取路径（可以是相对路径，可以是绝对路径）对应的文件 Inode
+    // mode 可以是 OPEN、CREATE、DELETE
+    // 没找到则返回 NULL
+    // 返回的是上锁了的 Inode 指针
+    // 若是创建文件模式，而且原来没有那个文件，则也返回 NULL，User里存可以放的地方
+    Inode* NameI(const char *path, int mode);
+
+    // 在 u.u_pdir 目录下加一个文件
+    // 
+    Inode* MakNode(int mode);
+    void WriteDir(Inode *pInode);
+
+    // 根据路径搜索相应的文件/目录，转化为相应的 Inode
+    // 返回上锁后的 Inode
+    Inode* GetPath(const char *path, int mode);
+
+    // 向当前父目录文件里写入一个目录项，diskInode编号为ino，名字为 name
+    void WriteDir(int ino, const char *name);
+
+    // 根据 User 检查 mode 对应的权限
+    // 可以访问则返回 0
+    int Access(Inode *pInode, int mode);
+};
+
+
+
+// 目录文件项
+class DirectoryEntry {
+
+public:
+    static const int DIRSIZ     = 28;
+
+public:
+    int     m_ino;              // 目录项 Inode 编号，0 代表空项
+    char    m_name[DIRSIZ];     // 目录项路径名
+
+public:
+    DirectoryEntry() {
+        m_ino = 0;
+        m_name[0] = '\0';
+    }
+
+    DirectoryEntry(int ino, const char *name) {
+        int i;
+        m_ino = ino;
+        for (i=0; i<DIRSIZ-1 && name[i] ; i++) {
+            m_name[i] = name[i];
+        }
+        m_name[i] = '\0';
+    }
+
+};
+
+
+#endif
