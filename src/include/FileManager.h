@@ -67,6 +67,7 @@ public:
     int Read(int fd, void *src, int size);
     int Write(int fd, void *src, int size);
 
+    int MkDir(const char *path);
     int SetCurDir(const char *path);
 
 public:
@@ -105,6 +106,7 @@ public:
     // 同时会修改 User 的 u_error
     // 可以访问则返回 0
     int Access(Inode *pInode, int mode);
+
 
 };
 

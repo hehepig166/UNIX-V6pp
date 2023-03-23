@@ -137,6 +137,16 @@ void test()
             if (t >= 0) fm.Close(t);
             cout <<t <<endl;
         }
+        else if (op == "mkdir") {
+            cin >>str;
+            t = fm.MkDir(str.c_str());
+            cout <<t <<endl;
+        }
+        else if (op == "cd") {
+            cin >>str;
+            t = fm.SetCurDir(str.c_str());
+            cout <<t <<endl;
+        }
         else if (op == "upload") {
             int mode = (Inode::IRWXU|Inode::IRWXG|Inode::IRWXO);
             int tot = 0;

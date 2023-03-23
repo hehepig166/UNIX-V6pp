@@ -5,7 +5,7 @@
 #include "Utility.h"
 #include "Parameters.h"
 
-static const int flag_debug = 1;
+static const int flag_debug = 0;
 
 
 Inode::Inode() {
@@ -27,7 +27,7 @@ Inode::Inode() {
 
 
 void Inode::ReadI() {
-    //if (flag_debug) Utility::LogError("Inode::ReadI");
+    if (flag_debug) Utility::LogError("Inode::ReadI");
     int lbn;            // 文件逻辑块号
     int bn;             // 对应到物理盘块号
     int offset;         // 当前字符块内编号
@@ -77,7 +77,7 @@ void Inode::ReadI() {
 
 
 void Inode::WriteI() {
-    //if (flag_debug) Utility::LogError("Inode::WriteI");
+    if (flag_debug) Utility::LogError("Inode::WriteI");
     int lbn;            // 文件逻辑块号
     int bn;             // 对应到物理盘块号
     int offset;         // 当前字符块内编号
@@ -132,7 +132,7 @@ void Inode::WriteI() {
 
 
 int Inode::Bmap(int lbn) {
-    //if (flag_debug) Utility::LogError("Inode::Bmap");
+    if (flag_debug) Utility::LogError("Inode::Bmap");
     Buf *pFirstBuf;
     Buf *pSecondBuf;
     int phyBlkno;           // 转换后的物理盘块号
@@ -356,7 +356,7 @@ bool Inode::IsLocked() {
 
 
 void Inode::Lock() {
-    //if (flag_debug) Utility::LogError("Inode::Lock");
+    if (flag_debug) Utility::LogError("Inode::Lock");
     while (i_flag & Inode::ILOCK) {
         i_flag |= Inode::IWANT;
         Utility::Sleep(1);
@@ -366,13 +366,13 @@ void Inode::Lock() {
 
 
 void Inode::Unlock() {
-    //if (flag_debug) Utility::LogError("Inode::Unlock");
+    if (flag_debug) Utility::LogError("Inode::Unlock");
     i_flag &= ~Inode::ILOCK;
 }
 
 
 void Inode::Clean() {
-    //this->i_flag = 0;
+    this->i_flag = 0;
     this->i_mode = 0;
     this->i_count = 0;
     this->i_nlink = 0;

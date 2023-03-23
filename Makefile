@@ -9,22 +9,30 @@ FLAGS				:=		$(COMMON_FILES) $(FLAG_CPP) $(FLAG_INCLUDE)
 #MAIN_FILE			:=		./src/test_format.cpp
 MAIN_FILE			:=		./src/test_filesystem.cpp
 
-target:	$(MAIN_FILE)
+ALL_FILES			:=		$(COMMON_FILES) $(MAIN_FILE)
+
+target: $(MAIN_FILE) $(COMMON_FILES)
 	g++ $< $(FLAGS) $(FLAG_DEBUG)
 
-debug: $(MAIN_FILE)
+debug: target
 	gdb ./a.out -tui -x gdb.txt
+
+all: $(ALL_FILES)
+	make clean
+	make format
+	make
+	./format disk.img
 
 run:
 	./a.out r
 
-device: ./src/test_device.cpp
+device: ./src/test_device.cpp $(COMMON_FILES)
 	g++ $< $(FLAGS) $(FLAG_DEBUG) -o $@
 
-format: ./src/test_format.cpp
+format: ./src/test_format.cpp $(COMMON_FILES)
 	g++ $< $(FLAGS) $(FLAG_DEBUG) -o $@
 
-file_system: ./src/test_filesystem.cpp
+file_system: ./src/test_filesystem.cpp $(COMMON_FILES)
 	g++ $< $(FLAGS) $(FLAG_DEBUG) -o $@
 
 debug_0322: format file_system

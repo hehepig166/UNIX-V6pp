@@ -61,6 +61,7 @@ void test_format(const char *fpath)
 // init
     Kernel::Instance().Initialize(fpath);
 
+    auto &u = Kernel::Instance().GetUser();
     auto &fs = Kernel::Instance().GetFileSystem();
     auto &bm = Kernel::Instance().GetBufferManager();
     auto &itb = Kernel::Instance().GetInodeTable();
@@ -87,12 +88,23 @@ void test_format(const char *fpath)
     pnode->i_addr[0] = t1;
     pnode->i_size = 0;
 
-    
+    DirectoryEntry tmpEnt[2];
+    tmpEnt[0] = DirectoryEntry(pnode->i_number, ".");
+    tmpEnt[1] = DirectoryEntry(pnode->i_number, "..");
+    u.u_IOParam.m_Base = (char*)tmpEnt;
+    u.u_IOParam.m_Offset = 0;
+    u.u_IOParam.m_Count = sizeof(tmpEnt);
+    pnode->WriteI();
 
     itb.IPut(pnode);
     cout <<"rootdir created." <<endl;
 
+    cout <<"mkdir /home  " <<"return " <<fm.MkDir("/home") <<endl;
+    cout <<"mkdir /dev   " <<"return " <<fm.MkDir("/dev") <<endl;
+    cout <<"mkdir /etc   " <<"return " <<fm.MkDir("/etc") <<endl;
+    cout <<"mkdir /root  " <<"return " <<fm.MkDir("/root") <<endl;
 
+/*
     t1 = fm.Create("/1.txt", FileManager::CREATE);
     cout <<"create file /1.txt [" <<t1 <<"]" <<endl;
 
@@ -106,6 +118,7 @@ void test_format(const char *fpath)
 
     cout <<"close [" <<t1 <<"] return " <<fm.Close(t1) <<endl;
     cout <<"close [" <<t2 <<"] return " <<fm.Close(t2) <<endl;
+*/
 
     return;
 

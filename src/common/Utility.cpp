@@ -104,3 +104,31 @@ std::string Utility::GetLastPath(const char *path) {
     auto dlist = SplitPath(path);
     return dlist.back();
 }
+
+
+std::string Utility::SimplifyAbsPath(const char *path) {
+    auto dlist = SplitPath(path);
+    std::vector<std::string> retlist;
+    std::string ret;
+
+    for (auto &name: dlist) if (name != "/") {
+        if (name == ".") {
+            // do nothing
+        }
+        else if (name == "..") {
+            if (retlist.size())
+                retlist.pop_back();
+        }
+        else {
+            retlist.push_back(name);
+        }
+    }
+
+    for (auto &name: retlist) {
+        ret += "/";
+        ret += name;
+    }
+    if (ret.empty()) ret = "/";
+
+    return ret;
+}

@@ -19,4 +19,5 @@ public:
     static std::vector<std::string> SplitPath(const char *path);    // 若是绝对路径，ret[0] = "/"
     static std::string GetParentPath(const char *path); // 除去末端分量
     static std::string GetLastPath(const char *path);   // 最末端的分量
+    static std::string SimplifyAbsPath(const char *path);  // 化简（./.. 之类的）
 };

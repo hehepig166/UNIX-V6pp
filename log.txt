@@ -1,0 +1,6 @@
+sizeof(DeviceManager)   344
+sizeof(BufferManager)   488
+sizeof(Inode)           72
+sizeof(SuperBlock)      1024
+
+[/]$ 

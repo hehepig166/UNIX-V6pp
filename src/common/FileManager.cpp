@@ -202,16 +202,70 @@ int FileManager::Rdwr(int fd, const void *src, int size, int mode) {
 
 
 
+int FileManager::MkDir(const char *path) {
+    User &u = Kernel::Instance().GetUser();
+    Inode *pInode;
+
+    int cIno = 0;   // 新目录 . ino
+    int pIno = 0;   // 新目录 .. ino
+    auto parentPath = Utility::GetParentPath(path);
+    auto lastPath = Utility::GetLastPath(path);
+
+    // 已存在
+    if ((pInode = NameI(path)) != NULL) {
+        Utility::LogError("path already exists.");
+        m_InodeTable->IPut(pInode);
+        return -1;
+    }
+
+
+    // 父目录不存在
+    if ((pInode = NameI(parentPath.c_str())) == NULL) {
+        Utility::LogError((parentPath+" doesn't exists.").c_str());
+        m_InodeTable->IPut(pInode);
+        return -1;
+    }
+    pIno = pInode->i_number;
+
+    // 创建目录文件
+    int ACCMode = Inode::IRWXU | Inode::IRWXG | Inode::IRWXO;
+    Inode *newInode = MakNode(pInode, lastPath.c_str(), ACCMode, GetDirList(pInode)[0].second);
+    m_InodeTable->IPut(pInode);
+    if (newInode == NULL) {
+        return -1;
+    }
+    cIno = newInode->i_number;
+
+    // 设置目录属性
+    newInode->i_mode &= ~Inode::IFMT;
+    newInode->i_mode |= Inode::IFDIR;
+
+    // 加入 . 和 ..
+    DirectoryEntry tmpEnt[2];
+    tmpEnt[0] = DirectoryEntry(cIno, ".");
+    tmpEnt[1] = DirectoryEntry(pIno, "..");
+    u.u_IOParam.m_Base = (char*)tmpEnt;
+    u.u_IOParam.m_Offset = 0;
+    u.u_IOParam.m_Count = sizeof(tmpEnt);
+    newInode->WriteI();
+
+
+    m_InodeTable->IPut(newInode);
+
+    return 0;
+}
+
+
 int FileManager::SetCurDir(const char *path) {
     User &u = Kernel::Instance().GetUser();
     Inode *pInode;
     
     pInode = NameI(path);
-    pInode->Unlock();       // 直接解锁（但保留引用）
     if (pInode == NULL) {
         return -1;
     }
-    if ((pInode->i_flag & Inode::IFMT) != Inode::IFDIR) {
+    pInode->Unlock();       // 直接解锁（但保留引用）
+    if ((pInode->i_mode & Inode::IFMT) != Inode::IFDIR) {
         // 检查是否是目录
         m_InodeTable->IPut(pInode);
         return -1;
@@ -227,6 +281,19 @@ int FileManager::SetCurDir(const char *path) {
     pInode->Unlock();
     m_InodeTable->IPut(u.u_pdir);
     u.u_pdir = pInode;
+
+    // 修改 u_curdirstr
+    std::string newdirstr;
+    if (path[0] == '/') {
+        newdirstr = path;
+    }
+    else {
+        newdirstr = u.u_curdirstr;
+        newdirstr += "/";
+        newdirstr += path;
+    }
+    newdirstr = Utility::SimplifyAbsPath(newdirstr.c_str());
+    Utility::StrCopy(newdirstr.c_str(), u.u_curdirstr, sizeof(u.u_curdirstr));
 
     return 0;
 }
