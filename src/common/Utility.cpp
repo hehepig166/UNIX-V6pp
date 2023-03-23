@@ -24,7 +24,9 @@ void Utility::LogError(const char *content) {
 }
 
 void Utility::Sleep(int secs) {
-    Sleep(secs);
+    Utility::LogError("Sleep");
+    sleep(secs);
+    //getchar();
 }
 
 void Utility::ByteCopy(const char *src, char *dst, int count) {
@@ -48,6 +50,13 @@ int Utility::StrCopy(const char *src, char *dst, const int mxlen, const char end
         dst[i] = src[i];
     dst[i] = '\0';
     return i;
+}
+
+void Utility::DWordMemset(void *s, int v, int c) {
+    int *p = (int*)s;
+    while (c--) {
+        *p++ = v;
+    }
 }
 
 

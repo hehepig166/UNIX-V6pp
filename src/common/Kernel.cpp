@@ -54,9 +54,9 @@ void Kernel::Initialize(const char *rootdev_path) {
 
 void Kernel::Connect(const char *path) {
     int fd = open(path, O_RDWR|O_CREAT, 00777);
-    lseek(fd, 4*PARAMS::PAGE_SIZE, SEEK_SET);
+    lseek(fd, 8*PARAMS::PAGE_SIZE, SEEK_SET);
     write(fd, "\0", 1);
-    void *p = mmap(0, 4*PARAMS::PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    void *p = mmap(0, 8*PARAMS::PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     close(fd);
 
     int szsum=0;

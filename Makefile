@@ -27,6 +27,14 @@ format: ./src/test_format.cpp
 file_system: ./src/test_filesystem.cpp
 	g++ $< $(FLAGS) $(FLAG_DEBUG) -o $@
 
+debug_0322: format file_system
+#	rm -f disk.img kernel
+	./format disk.img
+	make
+	make run <cmd1.txt
+	rm -f test.png
+	make debug
+
 .PHONY: clean
 clean:
 	rm -f a.out disk.img kernel device format file_system

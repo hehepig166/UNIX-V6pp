@@ -5,6 +5,8 @@
 #include "Utility.h"
 #include "Parameters.h"
 
+static const int flag_debug = 1;
+
 
 Inode::Inode() {
     this->i_flag = 0;
@@ -25,6 +27,7 @@ Inode::Inode() {
 
 
 void Inode::ReadI() {
+    //if (flag_debug) Utility::LogError("Inode::ReadI");
     int lbn;            // 文件逻辑块号
     int bn;             // 对应到物理盘块号
     int offset;         // 当前字符块内编号
@@ -74,6 +77,7 @@ void Inode::ReadI() {
 
 
 void Inode::WriteI() {
+    //if (flag_debug) Utility::LogError("Inode::WriteI");
     int lbn;            // 文件逻辑块号
     int bn;             // 对应到物理盘块号
     int offset;         // 当前字符块内编号
@@ -128,6 +132,7 @@ void Inode::WriteI() {
 
 
 int Inode::Bmap(int lbn) {
+    //if (flag_debug) Utility::LogError("Inode::Bmap");
     Buf *pFirstBuf;
     Buf *pSecondBuf;
     int phyBlkno;           // 转换后的物理盘块号
@@ -135,6 +140,7 @@ int Inode::Bmap(int lbn) {
     int index;
     BufferManager& bufMgr = Kernel::Instance().GetBufferManager();
     FileSystem& fileSys = Kernel::Instance().GetFileSystem();
+
 
     // 文件索引结构：
     // i_addr[0..5]     直接索引表
@@ -153,7 +159,6 @@ int Inode::Bmap(int lbn) {
         if (phyBlkno == 0 && (pFirstBuf = fileSys.Alloc(this->i_dev)) != NULL) {
             bufMgr.RlsBlk(pFirstBuf);       // 释放缓存
             phyBlkno = pFirstBuf->b_blkno;  // 记录物理块号
-
             this->i_addr[lbn] = phyBlkno;
             this->i_flag |= Inode::IUPD;
         }
@@ -174,10 +179,11 @@ int Inode::Bmap(int lbn) {
         // 若 i_addr[index] 为空，则分配一个物理块
         if (phyBlkno == 0) {
             if ((pFirstBuf = fileSys.Alloc(this->i_dev)) == NULL) {
-                Utility::Panic("cannot fileSys.Alloc() in Bmap");
-                return 0;
+                Utility::Panic("cannot fileSys.Alloc() in Bmap - 1");
+                return -1;
             }
             // 这里不用释放缓存，因为后面哈要用
+            phyBlkno = pFirstBuf->b_blkno;  // 记录物理块号
             this->i_addr[index] = phyBlkno;
             this->i_flag |= Inode::IUPD;
         }
@@ -194,23 +200,29 @@ int Inode::Bmap(int lbn) {
             phyBlkno = iTable[index];
             
             if (phyBlkno == 0) {
-                if ((pSecondBuf = fileSys.Alloc(this->i_dev)) != NULL) {
-                    Utility::Panic("cannot fileSys.Alloc() in Bmap");
+
+                if ((pSecondBuf = fileSys.Alloc(this->i_dev)) == NULL) {    //...
+                    Utility::Panic("cannot fileSys.Alloc() in Bmap - 2");
                     bufMgr.RlsBlk(pFirstBuf);   // 记得释放缓存
-                    return 0;
+                    return -1;
                 }
+
                 // 这里不用释放pSecond缓存，因为后面哈要用
+                phyBlkno = pSecondBuf->b_blkno;  // 记录物理块号
                 iTable[index] = pSecondBuf->b_blkno;  // 记录物理块号
                 bufMgr.RlsBlk(pFirstBuf);   // 记得释放缓存
             }
             else {
+
                 pSecondBuf = bufMgr.GetBlk(this->i_dev, phyBlkno);
+
                 bufMgr.RlsBlk(pFirstBuf);   // 记得释放缓存
             }
 
             // 为了让后面的代码复用，这里往后将耳机索引块看作一级索引块
             iTable = (int*)(pSecondBuf->b_addr);
             pFirstBuf = pSecondBuf;
+            pSecondBuf = NULL;
         }
 
         // 计算逻辑块号 lbn 最终位于“一级索引表”中的下标
@@ -221,16 +233,21 @@ int Inode::Bmap(int lbn) {
             index = (lbn - Inode::LARGE_FILE_BLOCK) % Inode::ADDRESS_PER_INDEX_BLOCK;
         }
 
-        if( (phyBlkno = iTable[index]) == 0 && (pSecondBuf = fileSys.Alloc(this->i_dev)) != NULL) {
-            phyBlkno = pSecondBuf->b_blkno;
-            iTable[index] = phyBlkno;
-            bufMgr.RlsBlk(pSecondBuf);
-            bufMgr.RlsBlk(pFirstBuf);
+        if( (phyBlkno = iTable[index]) == 0) {
+            if ( (pSecondBuf = fileSys.Alloc(this->i_dev)) != NULL ) {
+                phyBlkno = pSecondBuf->b_blkno;
+                iTable[index] = phyBlkno;
+                bufMgr.RlsBlk(pSecondBuf);
+                bufMgr.RlsBlk(pFirstBuf);
+            }
+            else {
+                bufMgr.RlsBlk(pFirstBuf);
+                Utility::Panic("cannot fileSys.Alloc() in Bmap - 3");
+                return -1;
+            }
         }
         else {
             bufMgr.RlsBlk(pFirstBuf);
-            Utility::Panic("err in Bmap.");
-            return 0;
         }
 
         return phyBlkno;
@@ -239,6 +256,7 @@ int Inode::Bmap(int lbn) {
 
 
 void Inode::IUpdate(int tme) {
+    if (flag_debug) Utility::LogError("Inode::IUpdate");
     Buf* pBuf;
     DiskInode dInode;
     FileSystem& filesys = Kernel::Instance().GetFileSystem();
@@ -338,6 +356,7 @@ bool Inode::IsLocked() {
 
 
 void Inode::Lock() {
+    //if (flag_debug) Utility::LogError("Inode::Lock");
     while (i_flag & Inode::ILOCK) {
         i_flag |= Inode::IWANT;
         Utility::Sleep(1);
@@ -347,6 +366,7 @@ void Inode::Lock() {
 
 
 void Inode::Unlock() {
+    //if (flag_debug) Utility::LogError("Inode::Unlock");
     i_flag &= ~Inode::ILOCK;
 }
 

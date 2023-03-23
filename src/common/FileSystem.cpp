@@ -6,6 +6,8 @@
 #include <sys/mman.h>
 #include <cstring>
 
+static const int flag_debug = 0;
+
 static BufferManager   *m_BufferManager;
 static InodeTable      *m_InodeTable;
 
@@ -34,7 +36,7 @@ void FileSystem::Shutdown() {
 
 
 void FileSystem::LoadSuperBlock() {
-    
+    if (flag_debug) Utility::LogError("FileSystem::LoadSuperBlock");
     m_spb = GetSuperBlock(PARAMS::ROOTDEV);
     if (m_spb == NULL) {
         Utility::Panic("cannot map superblock of rootdev!");
@@ -52,6 +54,7 @@ void FileSystem::LoadSuperBlock() {
 
 
 SuperBlock* FileSystem::GetSuperBlock(int dev) {
+    if (flag_debug) Utility::LogError("FileSystem::GetSuperBlock");
     if (dev < 0) return NULL;
     SuperBlock *ret = NULL;
     int fd = Kernel::Instance().GetDeviceManager().GetBlockDevice(dev)->fd;
@@ -68,6 +71,7 @@ SuperBlock* FileSystem::GetSuperBlock(int dev) {
 
 
 SuperBlock* FileSystem::GetFS(int dev) {
+    if (flag_debug) Utility::LogError("FileSystem::GetFS");
     for (int i=0; i<PARAMS::NMOUNT; i++) {
         if (m_Mount[i].m_spb!=NULL && m_Mount[i].m_dev==dev) {
             return m_Mount[i].m_spb;
@@ -78,6 +82,7 @@ SuperBlock* FileSystem::GetFS(int dev) {
 
 
 Inode* FileSystem::IAlloc(int dev) {
+    if (flag_debug) Utility::LogError("FileSystem::IAlloc");
     SuperBlock *sb;
     Buf *pBuf;
     Inode *pNode;
@@ -93,7 +98,7 @@ Inode* FileSystem::IAlloc(int dev) {
     // 上锁，搜索空闲 Inode 加入，解锁
     if (sb->s_ninode <= 0) {
 
-        sb->s_ilock++;
+        sb->s_ilock = 1;
 
         ino = -1;
 
@@ -135,10 +140,9 @@ Inode* FileSystem::IAlloc(int dev) {
                 break;
             }
         }
-
-        sb->s_ilock = 0;
         
         if (sb->s_ninode <= 0) {
+            sb->s_ilock = 0;
             Utility::LogError("No Space On Disk!  -IAlloc\n");
             return NULL;
         }
@@ -149,10 +153,11 @@ Inode* FileSystem::IAlloc(int dev) {
         // 出栈
         ino = sb->s_inode[--sb->s_ninode];
 
-        // 引用加一
+        // 引用加一，加锁
         pNode = m_InodeTable->IGet(dev, ino);
 
         if (pNode == NULL) {
+            sb->s_ilock = 0;
             return NULL;
         }
 
@@ -160,6 +165,7 @@ Inode* FileSystem::IAlloc(int dev) {
             pNode->Clean();
 
             sb->s_fmod = 1;
+            sb->s_ilock = 0;
             return pNode;
         }
         else {
@@ -169,12 +175,14 @@ Inode* FileSystem::IAlloc(int dev) {
         }
     }
 
+    sb->s_ilock = 0;
     return NULL;
 }
 
 
 
 void FileSystem::IFree(int dev, int number) {
+    if (flag_debug) Utility::LogError("FileSystem::IFree");
     SuperBlock *sb;
 
     sb = GetFS(dev);
@@ -187,12 +195,17 @@ void FileSystem::IFree(int dev, int number) {
         return;
     }
 
+    sb->s_ilock = 1;
+
     sb->s_inode[sb->s_ninode++] = number;
+
+    sb->s_ilock = 0;
 }
 
 
 
 Buf* FileSystem::Alloc(int dev) {
+    if (flag_debug) Utility::LogError("FileSystem::Alloc");
     int blkno;      // 分配到的空闲磁盘块编号
     SuperBlock *sb;
     Buf *pBuf;
@@ -202,13 +215,17 @@ Buf* FileSystem::Alloc(int dev) {
     while (sb->s_flock) {
         Utility::Sleep(1);
     }
+    sb->s_flock = 1;
 
     // 从索引表栈顶获取空闲磁盘块编号
     blkno = sb->s_free[--sb->s_nfree];
 
+    sb->s_flock = 0;
+
     // 若磁盘块编号为零，说明空闲磁盘块分配完了
     if (blkno == 0) {
         sb->s_nfree = 0;
+        sb->s_flock = 0;
         Utility::LogError("No Space on Disk! -Alloc\n");
         return NULL;
     }
@@ -234,12 +251,16 @@ Buf* FileSystem::Alloc(int dev) {
 
     pBuf = m_BufferManager->GetBlk(dev, blkno);
 
+    // 清空数据
+    Utility::DWordMemset(pBuf->b_addr, 0, PARAMS::BUFFER_SIZE/sizeof(int));
+
     return pBuf;
 }
 
 
 
 void FileSystem::Free(int dev, int blkno) {
+    if (flag_debug) Utility::LogError("FileSystem::Free");
     SuperBlock *sb = NULL;
     Buf *pBuf = NULL;
 

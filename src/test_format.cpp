@@ -46,11 +46,13 @@ void test_format(const char *fpath)
     }
 
     // 清零
-    memset(strbuf, 0, sizeof(strbuf));
-    for (int i=0; i<blknum+10; i++) {
-        lseek(fd, i*blksize, SEEK_SET);
-        write(fd, strbuf, blksize);
-    }
+    // memset(strbuf, 0, sizeof(strbuf));
+    // for (int i=0; i<blknum+10; i++) {
+    //     lseek(fd, i*blksize, SEEK_SET);
+    //     write(fd, strbuf, blksize);
+    // }
+    lseek(fd, (blknum+5)*blksize-1, SEEK_SET);
+    write(fd, "\0", 1);
 
     close(fd);
 
@@ -105,7 +107,7 @@ void test_format(const char *fpath)
     cout <<"close [" <<t1 <<"] return " <<fm.Close(t1) <<endl;
     cout <<"close [" <<t2 <<"] return " <<fm.Close(t2) <<endl;
 
-
+    return;
 
 //==================================================
 // test block alloc/free

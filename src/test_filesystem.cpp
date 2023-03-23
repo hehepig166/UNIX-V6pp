@@ -107,10 +107,10 @@ void test()
     auto &fm = Kernel::Instance().GetFileManager();
     auto &u = Kernel::Instance().GetUser();
     string op;
-    string str;
+    string str, str1, str2;
     Buf *pBuf;
     Inode *pnode;
-    int t, t1, t2;
+    int t, t1, t2, tt;
 
     while (1) {
         cout <<"\n[" <<u.u_curdirstr <<"]$ ";
@@ -136,6 +136,74 @@ void test()
             t = fm.Create(str.c_str(), FileManager::CREATE);
             if (t >= 0) fm.Close(t);
             cout <<t <<endl;
+        }
+        else if (op == "upload") {
+            int mode = (Inode::IRWXU|Inode::IRWXG|Inode::IRWXO);
+            int tot = 0;
+            cin >>str1 >>str2;
+            t1 = open(str1.c_str(), O_RDONLY);
+            if (t1 < 0) {
+                cout <<"faild to open " <<str1 <<endl;
+                continue;
+            }
+            t2 = fm.Create(str2.c_str(), mode);
+            if (t2 < 0) {
+                cout <<"failed to open " <<str2 <<endl;
+                close(t1);
+                continue;
+            }
+            cout <<"create [" <<t2 <<"]" <<endl;
+            while ((t = read(t1, strbuf, 1024)) > 0) {
+                while (t > 0) {
+                    //cout <<"..." <<endl;
+                    tt = fm.Write(t2, strbuf, t);
+                    if (tt > 0) {
+                        t -= tt;
+                    }
+                    tot += tt;
+                    //cout <<tt <<"bytes, tot " <<tot <<endl;
+                    // if (tot == 6097920) {
+                    //     int dfsafsadf = 1;
+                    //     getchar();
+                    //     cout <<"getchar" <<endl;
+                    //     getchar();
+                    // }
+                }
+            }
+            cout <<tot <<" bytes" <<endl;
+            close(t1);
+            cout <<"close [" <<t2 <<"] return " <<fm.Close(t2) <<endl;
+        }
+        else if (op == "download") {
+            int mode = (Inode::IRWXU|Inode::IRWXG|Inode::IRWXO);
+            int tot = 0;
+            cin >>str1 >>str2;
+            t1 = fm.Open(str1.c_str(), mode);
+            if (t1 < 0) {
+                cout <<"faild to open " <<str1 <<endl;
+                continue;
+            }
+            t2 = open(str2.c_str(), O_RDWR|O_CREAT);
+            if (t2 < 0) {
+                cout <<"failed to open " <<str2 <<endl;
+                fm.Close(t1);
+                continue;
+            }
+            cout <<"open [" <<t1 <<"]" <<endl;
+            while ((t = fm.Read(t1, strbuf, 1024)) > 0) {
+                while (t > 0) {
+                    //cout <<"..." <<endl;
+                    tt = write(t2, strbuf, t);
+                    if (tt > 0) {
+                        t -= tt;
+                    }
+                    tot += tt;
+                    //cout <<tt <<"bytes, tot " <<(tot+=tt) <<endl;
+                }
+            }
+            cout <<tot <<" bytes";
+            close(t2);
+            cout <<"close [" <<t1 <<"] return " <<fm.Close(t1) <<endl;
         }
 
         else if (op == "alloc") {

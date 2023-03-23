@@ -1,0 +1,2 @@
+upload _img5.png t
+exit

@@ -38,14 +38,14 @@ namespace PARAMS {
     static const int INODE_ZONE_SIZE = 1024 - 202;          // 磁盘上外存 Inode 区占据的扇区数
 
     static const int DATA_ZONE_START_SECTOR = 1024;         // 数据区起始扇区号
-    static const int DATA_ZONE_END_SECTOR = 20000 - 1;      // 数据区结束扇区号
-    static const int DATA_ZONE_SIZE = 20000 - DATA_ZONE_START_SECTOR;   // 数据区扇区数
+    static const int DATA_ZONE_END_SECTOR = 200000 - 1;      // 数据区结束扇区号
+    static const int DATA_ZONE_SIZE = 200000 - DATA_ZONE_START_SECTOR;   // 数据区扇区数
 
 
 
     // Inode
     static const int BLOCK_SIZE = 512;      // 文件逻辑块大小：512 B
-    static const int ADDRESS_PER_INDEX_BLOCK = BLOCK_SIZE / sizeof(int);    // 每个间接索引块包含的物理盘块号个数
+    static const int ADDRESS_PER_INDEX_BLOCK = BLOCK_SIZE / sizeof(int);    // 128 每个间接索引块包含的物理盘块号个数
 
     static const int SMALL_FILE_BLOCK = 6;                              // 小型文件：直接索引表最多可寻址的逻辑块号
     static const int LARGE_FILE_BLOCK = 128 * 2 + 6;                    // 大型文件：经过一次间接索引表最多可寻址的逻辑块号

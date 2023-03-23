@@ -18,7 +18,7 @@ public:
 
     Buf* GetBlk(int dev, int blkno);
     void RlsBlk(Buf *bp);   // count--
-    void DelBlk(Buf *bp);   // munmap
+    void DelBlk(Buf *bp);   // munmap, count=0
 
 };
 

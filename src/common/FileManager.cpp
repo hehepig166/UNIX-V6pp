@@ -12,6 +12,8 @@
 #include <string>
 #include <cstring>
 
+static const int flag_debug = 0;
+
 static FileSystem      *m_FileSystem;
 static InodeTable      *m_InodeTable;
 static OpenFileTable   *m_OpenFileTable;
@@ -36,6 +38,7 @@ void FileManager::ShutDown() {
 
 
 int FileManager::Open(const char *path, int mode) {
+    if (flag_debug) Utility::LogError("FileManager::Open");
     Inode *pInode;
 
     pInode = NameI(path);
@@ -50,6 +53,7 @@ int FileManager::Open(const char *path, int mode) {
 
 
 int FileManager::Create(const char *path, int mode) {
+    if (flag_debug) if (flag_debug) Utility::LogError("FileManager::Create");
     Inode *pInode;
     int newACCMode = mode & (Inode::IRWXU|Inode::IRWXG|Inode::IRWXO);
 
@@ -67,9 +71,16 @@ int FileManager::Create(const char *path, int mode) {
     auto dirlist = GetDirList(pInode);
     for (auto &[ent, offset]: dirlist) {
         if (lastPath == ent.m_name) {
-            // 同名文件存在，则重置该文件
+            // 同名文件存在，且没有正在被使用，则重置该文件
             m_InodeTable->IPut(pInode);
-            return Open1(pInode, File::FWRITE, 1);
+            pInode = NameI(path);
+            if (pInode->i_count == 0) {
+                return Open1(pInode, File::FWRITE, 1);
+            }
+            else {
+                m_InodeTable->IPut(pInode);
+                Utility::LogError("the file is being used");
+            }
         }
     }
 
@@ -84,6 +95,7 @@ int FileManager::Create(const char *path, int mode) {
 }
 
 int FileManager::FileManager::Open1(Inode *pInode, int mode, int trf) {
+    if (flag_debug) Utility::LogError("FileManager::Open1");
     User &u = Kernel::Instance().GetUser();
 
     if (trf != 2) {
@@ -109,7 +121,7 @@ int FileManager::FileManager::Open1(Inode *pInode, int mode, int trf) {
     }
 
     // 这里可以解锁了（来自 NameI 的锁），因为后面没有大量的文件操作了
-    pInode->Unlock();
+    //pInode->Unlock();
 
     File *pFile = m_OpenFileTable->FAlloc();
     int fd = u.u_tmp;
@@ -121,12 +133,15 @@ int FileManager::FileManager::Open1(Inode *pInode, int mode, int trf) {
     pFile->f_flag = mode & (File::FREAD | File::FWRITE);
     pFile->f_ino = Kernel::Instance().GetInodeTable().GetIndex(pInode);
 
+    pInode->Unlock();
+
     // 本进程 fd 在 FAlloc 中存在了 u.u_tmp 中
     return fd;
 }
 
 
 int FileManager::Close(int fd) {
+    if (flag_debug) Utility::LogError("FileManager::Close");
     User &u = Kernel::Instance().GetUser();
     File *pFile = u.u_ofiles.GetF(fd);
     if (pFile == NULL) {
@@ -140,12 +155,88 @@ int FileManager::Close(int fd) {
 
 
 
+int FileManager::Read(int fd, void *src, int size) {
+    return Rdwr(fd, src, size, File::FREAD);
+}
+
+int FileManager::Write(int fd, void *src, int size) {
+    return Rdwr(fd, src, size, File::FWRITE);
+}
+
+
+
+
+int FileManager::Rdwr(int fd, const void *src, int size, int mode) {
+    if (flag_debug) Utility::LogError("FileManager::Rdwr");
+    File *pFile;
+    User &u = Kernel::Instance().GetUser();
+
+    if ((pFile = u.u_ofiles.GetF(fd)) == NULL) {
+        Utility::LogError("fd does not exist.");
+        return -1;
+    }
+
+    if ((pFile->f_flag & mode) == 0) {
+        Utility::LogError("wrong access to the opened file.");
+        return -1;
+    }
+
+    u.u_IOParam.m_Base = (char*)src;
+    u.u_IOParam.m_Count = size;
+    u.u_IOParam.m_Offset = pFile->f_offset;
+
+    pFile->GetInode()->Lock();
+
+    if (mode == File::FREAD) {
+        pFile->GetInode()->ReadI();
+    }
+    else {
+        pFile->GetInode()->WriteI();
+    }
+
+    pFile->f_offset += (size - u.u_IOParam.m_Count);
+    pFile->GetInode()->Unlock();
+
+    return size - u.u_IOParam.m_Count;
+}
+
+
+
+int FileManager::SetCurDir(const char *path) {
+    User &u = Kernel::Instance().GetUser();
+    Inode *pInode;
+    
+    pInode = NameI(path);
+    pInode->Unlock();       // 直接解锁（但保留引用）
+    if (pInode == NULL) {
+        return -1;
+    }
+    if ((pInode->i_flag & Inode::IFMT) != Inode::IFDIR) {
+        // 检查是否是目录
+        m_InodeTable->IPut(pInode);
+        return -1;
+    }
+
+    // 切换 u.u_cidr
+    m_InodeTable->IPut(u.u_cdir);
+    u.u_cdir = pInode;
+
+    // 父目录也改，这时肯定存在，所以不判 NULL 和 FDIR 了
+    auto parpath = Utility::GetParentPath(path);
+    pInode = NameI(parpath.c_str());
+    pInode->Unlock();
+    m_InodeTable->IPut(u.u_pdir);
+    u.u_pdir = pInode;
+
+    return 0;
+}
 
 
 
 
 
 std::vector<std::pair<DirectoryEntry, int>> FileManager::GetDirList(Inode *pInode) {
+    if (flag_debug) Utility::LogError("FileManager::GetDirList");
     int tmp_offset = 0;
     int tmp_rest = pInode->i_size / sizeof(DirectoryEntry);
     BufferManager &bufMgr = Kernel::Instance().GetBufferManager();
@@ -205,6 +296,7 @@ std::vector<std::pair<DirectoryEntry, int>> FileManager::GetDirList(Inode *pInod
 
 
 Inode* FileManager::MakNode(Inode *parInode, const char *name, int mode, int offset) {
+    if (flag_debug) Utility::LogError("FileManager::MakNode");
     Inode *pInode;
     User &u = Kernel::Instance().GetUser();
 
@@ -237,6 +329,7 @@ Inode* FileManager::MakNode(Inode *parInode, const char *name, int mode, int off
 
 
 Inode* FileManager::NameI(const char *path) {
+    if (flag_debug) Utility::LogError("FileManager::NameI");
     auto splited_path = Utility::SplitPath(path);
     User &u = Kernel::Instance().GetUser();
     Inode *pInode;
@@ -265,6 +358,8 @@ Inode* FileManager::NameI(const char *path) {
 
         if (dirlist.empty()) goto out;
 
+        bool flag_found = false;
+
         for (const auto &[dent, offset]: dirlist) {
             if (fname == dent.m_name) {
                 int dev = pInode->i_dev;
@@ -273,10 +368,11 @@ Inode* FileManager::NameI(const char *path) {
                 if (pInode == NULL) {
                     return NULL;    // 这里不能 goto out
                 }
+                flag_found = true;
             }
         }
-
-        goto out;   // 没找到
+        
+        if (!flag_found) goto out;   // 没找到
     }
 
     return pInode;  // 走到这说明找到了最终节点，不解锁返回

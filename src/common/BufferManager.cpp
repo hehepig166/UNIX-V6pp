@@ -3,8 +3,11 @@
 #include "Kernel.h"
 #include "Parameters.h"
 
+#include "Utility.h"
+
 #include <sys/mman.h>
 
+static const int flag_debug = 0;
 
 void BufferManager::Initialize() {
     *this = BufferManager();
@@ -12,6 +15,7 @@ void BufferManager::Initialize() {
 }
 
 Buf* BufferManager::GetBlk(int dev, int blkno) {
+    if (flag_debug) Utility::LogError("BufferManager::GetBlk");
     Buf *pBuf;
     Buf *pBuf_empty = NULL;
     Buf *pBuf_nouse = NULL;
@@ -31,6 +35,7 @@ Buf* BufferManager::GetBlk(int dev, int blkno) {
                 pBuf_nouse = &(m_Buf[i]);
             }
         }
+
 
         // 没找到，则优先选用空的缓存块，没有再释放未引用的缓存块
         if (pBuf_empty) {
@@ -66,10 +71,12 @@ Buf* BufferManager::GetBlk(int dev, int blkno) {
 
 
 void BufferManager::RlsBlk(Buf *bp) {
+    if (flag_debug) Utility::LogError("BufferManager::RlsBlk");
     if (bp->b_count > 0) bp->b_count--;
 }
 
 void BufferManager::DelBlk(Buf *bp) {
+    if (flag_debug) Utility::LogError("BufferManager::DelBlk");
     if (bp->is_connected()) {
         int blkno = bp->b_blkno;
         int offset = blkno * PARAMS::BUFFER_SIZE / 4096 * 4096;

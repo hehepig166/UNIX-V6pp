@@ -4,6 +4,8 @@
 #include "Utility.h"
 
 
+static const int flag_debug = 0;
+
 
 static FileSystem *m_FileSystem;
 
@@ -20,6 +22,7 @@ void InodeTable::Reset() {
 
 
 Inode* InodeTable::IGet(int dev, int inumber) {
+    if (flag_debug) Utility::LogError("InodeTable::IGet");
     Inode *pInode;
     
 
@@ -80,6 +83,7 @@ Inode* InodeTable::IGet(int dev, int inumber) {
 
 
 void InodeTable::IPut(Inode *pInode) {
+    if (flag_debug) Utility::LogError("InodeTable::IPut");
     //if (pInode->i_count == 1) {
     if (true) {
         
@@ -104,6 +108,7 @@ void InodeTable::IPut(Inode *pInode) {
 
 
 void InodeTable::UpdateInodeTable() {
+    if (flag_debug) Utility::LogError("InodeTable::UpdateInodeTable");
     for (int i=0; i<InodeTable::NINODE; i++) {
         if ((m_Inode[i].i_flag & Inode::ILOCK)==0 && m_Inode[i].i_count != 0) {
             m_Inode[i].Lock();
@@ -125,10 +130,13 @@ int InodeTable::IsLoaded(int dev, int inumber) {
 
 
 Inode* InodeTable::GetFreeInode() {
-    for (int i=0; i<InodeTable::NINODE; i++) {
-        // 引用计数为零，说明空闲，这与 Buf 不同
-        if (m_Inode[i].i_count == 0) {
-            return &(m_Inode[i]);
+    if (flag_debug) Utility::LogError("InodeTable::GetFreeInode");
+    while (true) {
+        for (int i=0; i<InodeTable::NINODE; i++) {
+            // 引用计数为零，说明空闲，这与 Buf 不同
+            if (!m_Inode[i].IsLocked() && m_Inode[i].i_count == 0) {
+                return &(m_Inode[i]);
+            }
         }
     }
     return NULL;

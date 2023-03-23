@@ -64,6 +64,11 @@ public:
     int Create(const char *path, int mode);
     int Close(int fd);
 
+    int Read(int fd, void *src, int size);
+    int Write(int fd, void *src, int size);
+
+    int SetCurDir(const char *path);
+
 public:
 
     // 公共函数
@@ -86,6 +91,11 @@ public:
     // 没有就返回 NULL
     Inode* NameI(const char *path);
     
+
+    // Read, Write 公共部分
+    int Rdwr(int fd, const void *src, int size, int mode);
+
+
     // 在 parInode 目录下加一个文件
     // 返回新分配的 Inode（上锁）
     // 要指定目录项的 offset
